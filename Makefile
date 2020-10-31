@@ -13,11 +13,12 @@ VERSION:=$(shell awk -F\' '/const VERSION/ {print $$2}' < src/DDTrace/Tracer.php
 
 INI_FILE := $(shell php -i | awk -F"=>" '/Scan this dir for additional .ini files/ {print $$2}')/ddtrace.ini
 
-C_FILES := $(shell find ext src/{dogstatsd,ext} -name '*.c' -o -name '*.h' | awk '{ printf "$(BUILD_DIR)/%s\n", $$1 }' )
+DDPROF_FILES := $(shell find ext/DDProf/include -name '*.hh' | awk '{ printf "$(BUILD_DIR)/%s\n", $$1 }' )
+C_FILES := $(shell find ext src/{dogstatsd,ext} -name '*.cc' -o -name '*.c' -o -name '*.hh' -o -name '*.h' | awk '{ printf "$(BUILD_DIR)/%s\n", $$1 }' )
 TEST_FILES := $(shell find tests/ext -name '*.php*' -o -name '*.inc' | awk '{ printf "$(BUILD_DIR)/%s\n", $$1 }' )
 M4_FILES := $(shell find m4 -name '*.m4*' | awk '{ printf "$(BUILD_DIR)/%s\n", $$1 }' )
 
-ALL_FILES := $(C_FILES) $(TEST_FILES) $(BUILD_DIR)/config.m4 $(M4_FILES)
+ALL_FILES := $(C_FILES) $(DDPROF_FILES) $(TEST_FILES) $(BUILD_DIR)/config.m4 $(M4_FILES)
 
 $(BUILD_DIR)/%: %
 	$(Q) echo Copying $* to build dir

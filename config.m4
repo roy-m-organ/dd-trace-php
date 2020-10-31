@@ -19,6 +19,11 @@ if test "$PHP_DDTRACE" != "no"; then
 
   AX_EXECINFO
 
+  PHP_REQUIRE_CXX
+
+  CXXFLAGS="$CXXFLAGS -std=c++17"
+  CFLAGS="$CFLAGS -std=gnu11"
+
   AS_IF([test x"$ac_cv_header_execinfo_h" = xyes],
     dnl This duplicates some of AX_EXECINFO's work, but AX_EXECINFO puts the
     dnl library into LIBS, which we don't use anywhere else and am worried that
@@ -120,6 +125,7 @@ if test "$PHP_DDTRACE" != "no"; then
       src/ext/php7/handlers_pdo.c \
       src/ext/php7/handlers_phpredis.c \
       src/ext/php7/sampler.c \
+      src/ext/php7/ddprof.cc \
       src/ext/php7/serializer.c \
       src/ext/php7/startup_logging.c \
     "
@@ -127,7 +133,7 @@ if test "$PHP_DDTRACE" != "no"; then
     DD_TRACE_PHP_VERSION_SPECIFIC_SOURCES=""
   fi
 
-  PHP_NEW_EXTENSION(ddtrace, $DD_TRACE_PHP_SOURCES $DD_TRACE_PHP_VERSION_SPECIFIC_SOURCES, $ext_shared,, -DZEND_ENABLE_STATIC_TSRMLS_CACHE=1 -Wall -std=gnu11)
+  PHP_NEW_EXTENSION(ddtrace, $DD_TRACE_PHP_SOURCES $DD_TRACE_PHP_VERSION_SPECIFIC_SOURCES, $ext_shared,, -DZEND_ENABLE_STATIC_TSRMLS_CACHE=1 -Wall)
   PHP_ADD_BUILD_DIR($ext_builddir/src/ext, 1)
 
   PHP_CHECK_LIBRARY(rt, shm_open,
@@ -168,6 +174,7 @@ if test "$PHP_DDTRACE" != "no"; then
     PHP_ADD_BUILD_DIR([$ext_builddir/src/ext/php5])
   elif test $PHP_VERSION -lt 80000; then
     PHP_ADD_BUILD_DIR([$ext_builddir/src/ext/php7])
+    PHP_ADD_INCLUDE([$ext_srcdir/ext/DDProf/include])
   elif test $PHP_VERSION -lt 90000; then
     dnl PHP 8.0 uses things from the php7 folder too
     PHP_ADD_BUILD_DIR([$ext_builddir/src/ext/php7])
