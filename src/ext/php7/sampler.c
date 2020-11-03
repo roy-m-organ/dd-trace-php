@@ -1,5 +1,6 @@
 #include "sampler.h"
 
+#include <datadog/arena.h>
 #include <php.h>
 #include <pthread.h>
 
@@ -75,17 +76,7 @@ static dd_readv_result dd_process_vm_readv_multiple(pid_t pid, unsigned n, dd_re
     return bytes_read < 0 ? DD_READV_FAILURE : DD_READV_PARTIAL;
 }
 
-static void *dd_arena_try_alloc(zend_arena *arena, size_t size) {
-    char *ptr = arena->ptr;
-    size = ZEND_MM_ALIGNED_SIZE(size);
-    if (EXPECTED(size <= (size_t)(arena->end - ptr))) {
-        arena->ptr += size;
-        return ptr;
-    }
-    return NULL;
-}
-
-static zend_string *dd_readv_string(pid_t pid, zend_arena *arena, zend_string *remote) {
+static zend_string *dd_readv_string(pid_t pid, datadog_arena *arena, zend_string *remote) {
     if (!remote) {
         return NULL;
     }
@@ -103,8 +94,8 @@ static zend_string *dd_readv_string(pid_t pid, zend_arena *arena, zend_string *r
 
     // zend_strings are null terminated, hence the +1
     size_t total_size = offsetof(zend_string, val) + tmp.len + 1;
-    void *checkpoint = zend_arena_checkpoint(arena);
-    zend_string *local = dd_arena_try_alloc(arena, total_size);
+    void *checkpoint = datadog_arena_checkpoint(arena);
+    zend_string *local = (zend_string *)datadog_arena_try_alloc(arena, total_size);
     if (!local) {
         ddtrace_log_errf("Continuous profiling: failed to arena allocate a zend_string of length %l", total_size);
         return NULL;
@@ -113,7 +104,7 @@ static zend_string *dd_readv_string(pid_t pid, zend_arena *arena, zend_string *r
     result = dd_process_vm_readv(pid, (dd_readv_t){local, remote, total_size});
     if (UNEXPECTED(result != DD_READV_SUCCESS)) {
         ddtrace_log_errf("Continuous profiling: failed to read zend_string data");
-        zend_arena_release(&arena, checkpoint);
+        datadog_arena_restore(&arena, checkpoint);
         return NULL;
     }
 
@@ -123,7 +114,7 @@ static zend_string *dd_readv_string(pid_t pid, zend_arena *arena, zend_string *r
     return local;
 }
 
-ZEND_TLS zend_arena *profiling_arena = NULL;
+ZEND_TLS datadog_arena *profiling_arena = NULL;
 
 static void *dd_sample_handler(void *data) {
     UNUSED(data);
@@ -145,8 +136,8 @@ static void *dd_sample_handler(void *data) {
     pid_t pid = getpid();
 
     // if we run out of space in a single arena, stop gathering data
-    profiling_arena = zend_arena_create(1048576); // 1 MiB
-    void *checkpoint = zend_arena_checkpoint(profiling_arena);
+    profiling_arena = datadog_arena_create(1048576);  // 1 MiB
+    void *checkpoint = datadog_arena_checkpoint(profiling_arena);
 
     // todo: clean up
     void *collector = ddprof_make_stack_sampler();
@@ -223,7 +214,8 @@ static void *dd_sample_handler(void *data) {
 
             if (has_func) {
                 if (ZEND_USER_CODE(local_func.type)) {
-                    entries[entries_num].function = dd_readv_string(pid, profiling_arena, local_func.op_array.function_name);
+                    entries[entries_num].function =
+                        dd_readv_string(pid, profiling_arena, local_func.op_array.function_name);
                     if (!entries[entries_num].function && local_func.op_array.function_name) {
                         ddtrace_log_err("Continuous profiling: failed to read userland function name");
                     }
@@ -247,11 +239,11 @@ static void *dd_sample_handler(void *data) {
                 }
             }
 
-            ddtrace_push_stack_samples(collector, entries_num, entries);
+            ddtrace_record_stack_samples(collector, entries_num, entries);
 
             // Once events have been pushed we can reset entries and arena!
             // entries_num = 0;
-            // zend_arena_release(profiling_arena, checkpoint);
+            // datadog_arena_restore(&profiling_arena, checkpoint);
         } while (should_continue);
     }
 
@@ -298,36 +290,13 @@ void ddtrace_serialize_samples(HashTable *serialized) {
 
                 ZVAL_LONG(&tmp, entry->lineno);
                 ZEND_HASH_FILL_ADD(&tmp);
-            } ZEND_HASH_FILL_END();
+            }
+            ZEND_HASH_FILL_END();
 
             ZEND_HASH_FILL_ADD(&tuple);
         }
-    } ZEND_HASH_FILL_END();
-
-    /* OLD: works for filename/lineno (no empty filename)
-    for (entry_num = 0; entry_num < entries_num; ++entry_num) {
-        ddtrace_sample_entry *entry = &entries[entry_num];
-        zend_string *filename = entry->filename;
-        uint32_t lineno = entry->lineno;
-        zval *lines, *num;
-
-        lines = zend_hash_find(serialized, filename);
-        if (lines == NULL) {
-            zval lines_zv;
-            array_init(&lines_zv);
-            lines = zend_hash_update(serialized, filename, &lines_zv);
-        }
-
-        num = zend_hash_index_find(Z_ARR_P(lines), lineno);
-        if (num == NULL) {
-            zval num_zv;
-            ZVAL_LONG(&num_zv, 0);
-            num = zend_hash_index_update(Z_ARR_P(lines), lineno, &num_zv);
-        }
-
-        increment_function(num);
     }
-     */
+    ZEND_HASH_FILL_END();
 }
 
 void ddtrace_sampler_rshutdown(void) {
@@ -348,6 +317,6 @@ void ddtrace_sampler_rshutdown(void) {
     pthread_join(thread_id, NULL);
 
     zend_array_destroy(Z_ARR(serialized));
-    zend_arena_destroy(profiling_arena);
+    datadog_arena_destroy(profiling_arena);
     efree(entries);
 }

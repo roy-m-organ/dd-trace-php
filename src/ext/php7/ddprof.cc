@@ -57,7 +57,7 @@ class stack_collector : public ddprof::collector {
 
 }  // namespace ddtrace
 
-void ddtrace_push_stack_samples(void *obj, size_t size, ddtrace_sample_entry entries[]) {
+void ddtrace_record_stack_samples(void *obj, size_t size, ddtrace_sample_entry *entries) {
     auto collector = reinterpret_cast<ddtrace::stack_collector *>(obj);
     collector->push(size, entries);
 }

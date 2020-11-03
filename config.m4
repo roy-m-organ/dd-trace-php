@@ -95,6 +95,7 @@ if test "$PHP_DDTRACE" != "no"; then
     "
   elif test $PHP_VERSION -lt 80000; then
     DD_TRACE_PHP_VERSION_SPECIFIC_SOURCES="\
+      ext/DatadogArena/arena.c \
       src/ext/php7/auto_flush.c \
       src/ext/php7/dispatch.c \
       src/ext/php7/distributed_tracing.c \
@@ -107,6 +108,8 @@ if test "$PHP_DDTRACE" != "no"; then
       src/ext/php7/handlers_mysqli.c \
       src/ext/php7/handlers_pdo.c \
       src/ext/php7/handlers_phpredis.c \
+      src/ext/php7/ddprof.cc \
+      src/ext/php7/sampler.c \
       src/ext/php7/serializer.c \
       src/ext/php7/startup_logging.c \
     "
@@ -124,8 +127,6 @@ if test "$PHP_DDTRACE" != "no"; then
       src/ext/php7/handlers_mysqli.c \
       src/ext/php7/handlers_pdo.c \
       src/ext/php7/handlers_phpredis.c \
-      src/ext/php7/sampler.c \
-      src/ext/php7/ddprof.cc \
       src/ext/php7/serializer.c \
       src/ext/php7/startup_logging.c \
     "
@@ -149,6 +150,8 @@ if test "$PHP_DDTRACE" != "no"; then
   PHP_ADD_INCLUDE([$ext_srcdir])
   PHP_ADD_INCLUDE([$ext_srcdir/ext])
   PHP_ADD_INCLUDE([$ext_srcdir/src/ext])
+  PHP_ADD_INCLUDE([$ext_srcdir/ext/DatadogArena])
+  PHP_ADD_BUILD_DIR([$ext_builddir/ext/DatadogArena])
 
   PHP_ADD_INCLUDE([$ext_srcdir/ext/vendor])
   PHP_ADD_BUILD_DIR([$ext_builddir/ext/vendor])

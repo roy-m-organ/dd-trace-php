@@ -15,6 +15,6 @@ void ddtrace_sampler_rshutdown(void);
 void *ddprof_make_stack_sampler(void);
 void ddprof_destroy_stack_sampler(void *collector);
 
-void ddtrace_push_stack_samples(void *collector, size_t size, ddtrace_sample_entry entries[]);
+void ddtrace_record_stack_samples(void *collector, size_t size, ddtrace_sample_entry *entries);
 
 #endif  // DD_TRACE_SAMPLER_H
