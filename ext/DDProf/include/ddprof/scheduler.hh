@@ -49,23 +49,14 @@ inline void scheduler::periodic() {
     interval = std::max(nanoseconds(0), configured_interval - (stop_time - start_time));
 }
 
-namespace {
-// todo: full license info. This technique comes from GDB.
-template <typename R, typename A1, typename A2>
-void set_thread_name(R (*set_name)(A1, A2), const char *name) {
-    set_name(pthread_self(), name);
-}
-
-template <typename R, typename A1>
-void set_thread_name(R (*set_name)(A1), const char *name) {
-    set_name(name);
-}
-}  // namespace
-
 inline void scheduler::on_start() noexcept {
 #if defined(__GLIBC__) || defined(__APPLE__)
     const char name[16] = "ddprof::sched";
-    set_thread_name(pthread_setname_np, name);
+#if defined(__GLIBC__)
+    pthread_setname_np(pthread_self(), name);
+#else
+    pthread_setname_np(name);
+#endif
 #endif
     last_export = system_clock::now();
 }

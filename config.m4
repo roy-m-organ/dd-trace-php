@@ -23,6 +23,7 @@ if test "$PHP_DDTRACE" != "no"; then
 
   CXXFLAGS="$CXXFLAGS -std=c++17"
   CFLAGS="$CFLAGS -std=gnu11"
+  CPPFLAGS="$CPPFLAGS -D _GNU_SOURCE"
 
   AS_IF([test x"$ac_cv_header_execinfo_h" = xyes],
     dnl This duplicates some of AX_EXECINFO's work, but AX_EXECINFO puts the

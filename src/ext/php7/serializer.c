@@ -490,32 +490,6 @@ static int dd_add_meta_array(void *context, ddtrace_string key, ddtrace_string v
     return zend_symtable_str_update(Z_ARR_P(meta), key.ptr, key.len, &tmp) != NULL ? SUCCESS : FAILURE;
 }
 
-#define KEY_MAX_LEN 1024  // Seat of the pants
-
-// The UI currently does funky things with periods in keys, so trying something else...
-static void dd_undot_key(char *buf, zend_string *key) {
-    smart_str undotted = {0};
-    smart_str_alloc(&undotted, ZSTR_LEN(key) + 6, 0);  // Add some headroom
-
-    const char *val = ZSTR_VAL(key);
-    unsigned long pos = 0;
-    unsigned char c;
-    while (pos < ZSTR_LEN(key)) {
-        c = val[pos++];
-        switch (c) {
-            case '.':
-                smart_str_appendc(&undotted, ',');
-                break;
-            default:
-                smart_str_appendc(&undotted, c);
-                break;
-        }
-    }
-    smart_str_0(&undotted);
-    snprintf(buf, KEY_MAX_LEN, "subtrace.%s", ZSTR_VAL(undotted.s));
-    smart_str_free(&undotted);
-}
-
 static void _serialize_meta(zval *el, ddtrace_span_fci *span_fci) {
     ddtrace_span_t *span = &span_fci->span;
     zval meta_zv, *meta = ddtrace_spandata_property_meta(span->span_data);
