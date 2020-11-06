@@ -63,8 +63,10 @@ void set_thread_name(R (*set_name)(A1), const char *name) {
 }  // namespace
 
 inline void scheduler::on_start() noexcept {
+#if defined(__GLIBC__) || defined(__APPLE__)
     const char name[16] = "ddprof::sched";
     set_thread_name(pthread_setname_np, name);
+#endif
     last_export = system_clock::now();
 }
 
