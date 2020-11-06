@@ -3,6 +3,10 @@
 
 #include <vector>
 
+extern "C" {
+#include <pthread.h>
+};
+
 #include "chrono.hh"
 #include "exporter.hh"
 #include "recorder.hh"
@@ -13,21 +17,22 @@ namespace ddprof {
 class scheduler : public periodic_service {
     using nanoseconds = std::chrono::nanoseconds;
     class recorder &recorder;
-    std::vector<exporter *> exporters;
+    std::vector<std::unique_ptr<exporter>> &exporters;
     std::chrono::nanoseconds configured_interval;
     system_clock::time_point last_export;
 
    public:
-    scheduler(class recorder &r, std::vector<exporter *> &exporters, nanoseconds cfg_interval) noexcept;
-    virtual ~scheduler();
+    scheduler(class recorder &r, std::vector<std::unique_ptr<exporter>> &exporters, nanoseconds cfg_interval) noexcept;
+    ~scheduler() override;
 
-    virtual void start() noexcept;
-    virtual void stop() noexcept;
+    void on_start() noexcept override;
+    void on_stop() noexcept override;
 
-    virtual void periodic();
+    void periodic() override;
 };
 
-inline scheduler::scheduler(class recorder &r, std::vector<exporter *> &exporters, nanoseconds cfg_interval) noexcept
+inline scheduler::scheduler(class recorder &r, std::vector<std::unique_ptr<exporter>> &exporters,
+                            nanoseconds cfg_interval) noexcept
     : recorder{r}, exporters{exporters}, configured_interval{cfg_interval} {}
 
 inline void scheduler::periodic() {
@@ -44,17 +49,26 @@ inline void scheduler::periodic() {
     interval = std::max(nanoseconds(0), configured_interval - (stop_time - start_time));
 }
 
-inline void scheduler::start() noexcept {
-    // todo: log scheduler start-up
-    periodic_service::start();
+namespace {
+// todo: full license info. This technique comes from GDB.
+template <typename R, typename A1, typename A2>
+void set_thread_name(R (*set_name)(A1, A2), const char *name) {
+    set_name(pthread_self(), name);
+}
+
+template <typename R, typename A1>
+void set_thread_name(R (*set_name)(A1), const char *name) {
+    set_name(name);
+}
+}  // namespace
+
+inline void scheduler::on_start() noexcept {
+    const char name[16] = "ddprof::sched";
+    set_thread_name(pthread_setname_np, name);
     last_export = system_clock::now();
 }
 
-inline void scheduler::stop() noexcept {
-    // todo: log scheduler stop
-    periodic_service::stop();
-    last_export = system_clock::now();
-}
+inline void scheduler::on_stop() noexcept { periodic(); }
 
 inline scheduler::~scheduler() = default;
 

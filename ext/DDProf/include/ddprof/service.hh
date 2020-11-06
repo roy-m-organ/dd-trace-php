@@ -21,15 +21,20 @@ class service {
     service &operator=(const service &) = delete;
 
     virtual void start() = 0;
-    virtual void stop() = 0;
+    virtual void stop() noexcept = 0;
     virtual void join() = 0;
 };
 
 class periodic_service : public service {
-    std::mutex m;
+   protected:
     std::thread thread;
-    std::atomic<bool> should_continue{false};
-    std::atomic<bool> actually_started{false};
+    std::atomic<bool> should_continue_{false};
+
+    bool should_continue() noexcept;
+
+    virtual void periodic();  // noexcept?
+    virtual void on_start() noexcept;
+    virtual void on_stop() noexcept;
 
    public:
     // positive numbers only
@@ -38,13 +43,12 @@ class periodic_service : public service {
     periodic_service();
     ~periodic_service() override;
 
-    virtual void periodic() = 0;
-
-    void start() override;
-    void stop() override;
-    void join() override;
-
-    bool has_started() const noexcept;
+    /* start and stop are final because they hold locks, and mixing inheritance
+     * and locks has proven to be difficult.
+     */
+    void start() final;
+    void stop() noexcept final;
+    void join() final;
 };
 
 inline constexpr service::service() noexcept = default;
@@ -53,28 +57,27 @@ inline service::~service() = default;
 inline periodic_service::periodic_service() = default;
 inline periodic_service::~periodic_service() = default;
 
+inline void periodic_service::periodic() {}
+inline void periodic_service::on_start() noexcept {}
+inline void periodic_service::on_stop() noexcept {}
+
+inline bool periodic_service::should_continue() noexcept { return should_continue_; }
+
 inline void periodic_service::start() {
-    std::lock_guard<std::mutex> lock{m};
-    should_continue = true;
+    should_continue_ = true;
     thread = std::thread([this]() {
-        actually_started = true;
-        while (should_continue) {
+        on_start();
+        while (should_continue()) {
             std::this_thread::sleep_for(interval);
             periodic();
         }
+        on_stop();
     });
 }
 
-inline void periodic_service::stop() { should_continue = false; }
+inline void periodic_service::stop() noexcept { should_continue_ = false; }
 
-bool periodic_service::has_started() const noexcept { return actually_started; }
-
-inline void periodic_service::join() {
-    // hmm... lock?
-    if (thread.joinable()) {
-        thread.join();
-    }
-}
+inline void periodic_service::join() { thread.join(); }
 
 }  // namespace ddprof
 

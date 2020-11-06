@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <string_view>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -30,14 +31,14 @@ class recorder {
    public:
     // All public operations on object must be thread-safe with each other
 
-    string_table &get_string_table() noexcept;
     void push(std::unique_ptr<event> event);
     void push(size_t num_events, std::unique_ptr<event> events[]);
 
+    interned_string &intern(std::string_view);
+    interned_string &intern(interned_string &);
+
     std::pair<event_table_t, string_table> release() noexcept;
 };
-
-inline string_table &recorder::get_string_table() noexcept { return strings; }
 
 inline void recorder::push(std::unique_ptr<event> event) {
     std::lock_guard<std::mutex> lock{m};
@@ -67,6 +68,16 @@ inline std::pair<recorder::event_table_t, string_table> recorder::release() noex
 inline std::size_t recorder::event_hash::operator()(enum event::type type) const noexcept {
     using underlying = std::underlying_type<enum event::type>::type;
     return std::hash<underlying>{}(static_cast<underlying>(type));
+}
+
+inline interned_string &recorder::intern(std::string_view string) {
+    std::lock_guard<std::mutex> lock{m};
+    return strings.intern(string);
+}
+
+inline interned_string &recorder::intern(interned_string &string) {
+    std::lock_guard<std::mutex> lock{m};
+    return strings.intern(string);
 }
 
 }  // namespace ddprof

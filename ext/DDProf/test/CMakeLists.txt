@@ -10,7 +10,8 @@ add_library(catch2main main.cc)
 target_link_libraries(catch2main PUBLIC Catch2::Catch2)
 set_target_properties(catch2main PROPERTIES CXX_STANDARD 17)
 
-add_executable(test_ddprof exporter.cc fixed_alloc.cc periodic_service.cc scheduler.cc string_table.cc)
+add_executable(test_ddprof exporter.cc periodic_service.cc scheduler.cc string_table.cc)
 target_link_libraries(test_ddprof PUBLIC catch2main DDProf::DDProf)
 
 catch_discover_tests(test_ddprof)
+

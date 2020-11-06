@@ -914,6 +914,7 @@ bool ddtrace_coms_init_and_start_writer(void) {
     writer->thread = thread;
     atomic_store(&writer->starting_up, true);
     if (pthread_create(&thread->self, NULL, &_dd_writer_loop, NULL) == 0) {
+        pthread_setname_np(thread->self, "ddtrace::bgs");
         return true;
     } else {
         return false;

@@ -108,9 +108,9 @@ if test "$PHP_DDTRACE" != "no"; then
       src/ext/php7/handlers_mysqli.c \
       src/ext/php7/handlers_pdo.c \
       src/ext/php7/handlers_phpredis.c \
-      src/ext/php7/ddprof.cc \
-      src/ext/php7/sampler.c \
+      src/ext/php7/profiler.cc \
       src/ext/php7/serializer.c \
+      src/ext/php7/stack_collector.cc \
       src/ext/php7/startup_logging.c \
     "
   elif test $PHP_VERSION -lt 90000; then

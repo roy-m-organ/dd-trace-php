@@ -6,7 +6,7 @@ TEST_CASE("scheduler basics", "[scheduler]") {
     class test_exporter : public ddprof::exporter {
        public:
         bool &exported;
-        test_exporter(bool &b) : exported{b} {}
+        explicit test_exporter(bool &b) : exported{b} {}
 
         void operator()(const ddprof::recorder::event_table_t &event_table, const ddprof::string_table &strings,
                         ddprof::system_clock::time_point start_time,
@@ -19,21 +19,19 @@ TEST_CASE("scheduler basics", "[scheduler]") {
     bool exported = false;
 
     {
-        test_exporter exporter{exported};
         auto interval = std::chrono::milliseconds(10);
         ddprof::recorder recorder;
-        std::vector<ddprof::exporter *> exporters = {&exporter};
+        std::vector<std::unique_ptr<ddprof::exporter>> exporters{};
+        exporters.emplace_back(std::unique_ptr<ddprof::exporter>(new test_exporter{exported}));
 
-        ddprof::scheduler scheduler{recorder, exporters, interval};
-        scheduler.start();
-        while (!scheduler.has_started()) {
-            std::this_thread::sleep_for(interval);
-        }
-
+        /* We should be able to push the events into the recorder before the
+         * scheduler starts, as it should do a final collection when it stops.
+         */
         auto event = new ddprof::event(ddprof::basic_event{0, ddprof::system_clock::now()});
         recorder.push(std::unique_ptr<ddprof::event>(event));
 
-        std::this_thread::sleep_for(interval);
+        ddprof::scheduler scheduler{recorder, exporters, interval};
+        scheduler.start();
 
         scheduler.stop();
         scheduler.join();

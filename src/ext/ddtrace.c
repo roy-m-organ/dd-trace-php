@@ -44,9 +44,6 @@
 #include "integrations/integrations.h"
 #include "logging.h"
 #include "memory_limit.h"
-#if PHP_VERSION_ID >= 70000
-#include "php7/sampler.h"
-#endif
 #include "random.h"
 #include "request_hooks.h"
 #include "serializer.h"
@@ -325,6 +322,11 @@ static void _dd_disable_if_incompatible_sapi_detected(TSRMLS_D) {
     DDTRACE_G(disable) = 1;
 }
 
+#if PHP_VERSION_ID >= 70000 && PHP_VERSION_ID < 80000
+#include "php7/profiler.h"
+ddtrace_profiler *profiler = NULL;
+#endif
+
 static PHP_MINIT_FUNCTION(ddtrace) {
     UNUSED(type);
     REGISTER_STRING_CONSTANT("DD_TRACE_VERSION", PHP_DDTRACE_VERSION, CONST_CS | CONST_PERSISTENT);
@@ -349,6 +351,10 @@ static PHP_MINIT_FUNCTION(ddtrace) {
     if (DDTRACE_G(disable)) {
         return SUCCESS;
     }
+
+#if PHP_VERSION_ID >= 70000 && PHP_VERSION_ID < 80000
+    profiler = ddtrace_profiler_create();
+#endif
 
     ddtrace_bgs_log_minit();
 
@@ -378,6 +384,10 @@ static PHP_MSHUTDOWN_FUNCTION(ddtrace) {
         return SUCCESS;
     }
 
+#if PHP_VERSION_ID >= 70000 && PHP_VERSION_ID < 80000
+    ddtrace_profiler_stop(profiler);
+#endif
+
     ddtrace_integrations_mshutdown();
 
     ddtrace_signals_mshutdown();
@@ -392,6 +402,14 @@ static PHP_MSHUTDOWN_FUNCTION(ddtrace) {
     }
 
     ddtrace_engine_hooks_mshutdown();
+
+#if PHP_VERSION_ID >= 70000 && PHP_VERSION_ID < 80000
+    ddtrace_profiler_join(profiler);
+    if (profiler) {
+        ddtrace_profiler_destroy(profiler);
+        profiler = NULL;
+    }
+#endif
 
     return SUCCESS;
 }
@@ -420,6 +438,10 @@ static PHP_RINIT_FUNCTION(ddtrace) {
 
         ddtrace_startup_logging_first_rinit();
     }
+
+#if PHP_VERSION_ID >= 70000 && PHP_VERSION_ID < 80000
+    ddtrace_profiler_start(profiler);
+#endif
 
 #if PHP_MAJOR_VERSION < 7
     DDTRACE_G(should_warn_call_depth) = ddtrace_get_bool_config("DD_TRACE_WARN_CALL_STACK_DEPTH", TRUE TSRMLS_CC);
@@ -455,10 +477,6 @@ static PHP_RINIT_FUNCTION(ddtrace) {
 
     dd_prepare_for_new_trace(TSRMLS_C);
 
-#if PHP_VERSION_ID >= 70000
-    ddtrace_sampler_rinit();
-#endif
-
     return SUCCESS;
 }
 
@@ -469,11 +487,15 @@ static PHP_RSHUTDOWN_FUNCTION(ddtrace) {
         return SUCCESS;
     }
 
+#if PHP_VERSION_ID >= 70000 && PHP_VERSION_ID < 80000
+    // todo: ZTS
+    // ddtrace_profiler_stop(profiler);
+#endif
+
     zval_dtor(&DDTRACE_G(additional_trace_meta));
     ZVAL_NULL(&DDTRACE_G(additional_trace_meta));
 
     ddtrace_engine_hooks_rshutdown(TSRMLS_C);
-    ddtrace_sampler_rshutdown();
     ddtrace_internal_handlers_rshutdown();
     ddtrace_dogstatsd_client_rshutdown(TSRMLS_C);
 

@@ -129,7 +129,7 @@ inline std::ostream &operator<<(std::ostream &out, enum event::type type) {
     return out << (int)static_cast<underlying>(type);
 }
 
-inline std::ostream &operator<<(std::ostream &out, const class event &event) {
+inline std::ostream &operator<<(std::ostream &out, const struct event &event) {
     out << "{ type:" << event.type;
     out << "; name: " << event.basic.name;
     out << "; timestamp: " << event.basic.timestamp.time_since_epoch().count();
