@@ -1,6 +1,6 @@
 Q := @
 REDIS_IMAGE := datadog/dd-trace-ci:php-redis-5.0
-REQUEST_REPLAYER_IMAGE := datadog/dd-trace-ci:php-request-replayer
+REQUEST_REPLAYER_IMAGE := datadog/dd-trace-ci:php-request-replayer-1.0
 
 redis_build:
 	$(Q) docker build -t $(REDIS_IMAGE) redis
